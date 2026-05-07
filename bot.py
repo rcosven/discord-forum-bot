@@ -142,14 +142,14 @@ Muestra publicaciones programadas.
 async def hora_slash(interaction: discord.Interaction):
     ahora = datetime.now(TZ)
 
-    await interaction.followup.send(
+    await interaction.response.send_message(
         f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
     )
 @bot.tree.command(name="programar", description="Programa una publicación", guild=discord.Object(id=GUILD_ID))
 async def programar_slash(
     interaction: discord.Interaction,
     post_id: str,
-    foro_destino: discord.abc.GuildChannel,
+    foro_destino: discord.ForumChannel,
     fecha: str,
     hora: str
 ):
@@ -162,7 +162,7 @@ async def programar_slash(
         ahora = datetime.now(TZ)
 
         if fecha_hora <= ahora:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 f"❌ Esa hora ya pasó.\n"
                 f"Hora actual: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`",
                 ephemeral=True
@@ -176,12 +176,12 @@ async def programar_slash(
             args=[int(post_id), foro_destino.id]
         )
 
-        await interaction.followup.send(
+        await interaction.response.send_message(
             f"✅ Programado.\n"
             f"📁 Destino: {foro_destino.mention}\n"
             f"🕒 Hora: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}`"
         )
 
     except Exception as e:
-        await interaction.followup.send(f"❌ Error: `{e}`")
+        await interaction.response.send_message(f"❌ Error: `{e}`")
 bot.run(TOKEN)

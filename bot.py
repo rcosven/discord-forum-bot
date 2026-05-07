@@ -49,8 +49,9 @@ async def on_ready():
         scheduler.start()
 
     try:
-        synced = await bot.tree.sync()
-        print(f"Slash commands sincronizados: {len(synced)}")
+        guild = discord.Object(id=GUILD_ID)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"Slash commands sincronizados en servidor: {len(synced)}")
     except Exception as e:
         print(e)
 
@@ -137,14 +138,14 @@ Muestra la hora actual del bot.
 Muestra publicaciones programadas.
 """)
 
-@bot.tree.command(name="hora", description="Muestra la hora actual del bot")
+@bot.tree.command(name="hora", description="Muestra la hora actual del bot", guild=discord.Object(id=GUILD_ID))
 async def hora_slash(interaction: discord.Interaction):
     ahora = datetime.now(TZ)
 
     await interaction.response.send_message(
         f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
     )
-@bot.tree.command(name="programar", description="Programa una publicación")
+@bot.tree.command(name="programar", description="Programa una publicación", guild=discord.Object(id=GUILD_ID))
 async def programar_slash(
     interaction: discord.Interaction,
     post_id: str,
@@ -184,3 +185,4 @@ async def programar_slash(
         await interaction.response.send_message(f"❌ Error: `{e}`")
 
 bot.run(TOKEN)
+GUILD_ID = int(os.getenv("GUILD_ID"))

@@ -3,14 +3,17 @@ import discord
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 TOKEN = os.getenv("DISCORD_TOKEN")
+
+TZ = ZoneInfo("America/Santiago")
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-scheduler = AsyncIOScheduler()
+scheduler = AsyncIOScheduler(timezone=TZ)
 
 
 async def clonar_post(post_id: int, foro_destino_id: int):
@@ -43,8 +46,8 @@ async def on_ready():
         scheduler.start()
 
 
-@bot.command()
-async def clonar(ctx, post_id: int, foro_destino_id: int):
+@bot.command(name="clonar_ahora")
+async def clonar_ahora(ctx, post_id: int, foro_destino_id: int):
     await ctx.send("Clonando publicación...")
     try:
         await clonar_post(post_id, foro_destino_id)
@@ -57,36 +60,33 @@ async def clonar(ctx, post_id: int, foro_destino_id: int):
 async def programar(ctx, post_id: int, foro_destino_id: int, fecha: str, hora: str):
     try:
         fecha_hora = datetime.strptime(f"{fecha} {hora}", "%Y-%m-%d %H:%M")
+        fecha_hora = fecha_hora.replace(tzinfo=TZ)
 
-        scheduler.add_job(
+        ahora = datetime.now(TZ)
+
+        if fecha_hora <= ahora:
+            await ctx.send(
+                f"❌ Esa hora ya pasó.\n"
+                f"Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
+            )
+            return
+
+        job = scheduler.add_job(
             clonar_post,
             "date",
             run_date=fecha_hora,
             args=[post_id, foro_destino_id]
         )
 
-        await ctx.send(f"✅ Programado para `{fecha} {hora}`.")
+        await ctx.send(
+            f"✅ Programado para `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile.\n"
+            f"Job ID: `{job.id}`"
+        )
+
     except Exception as e:
         await ctx.send(f"❌ Error: `{e}`")
 
 
-@bot.command()
-async def ayuda(ctx):
-    await ctx.send("""
-**Comandos**
-
-`!clonar ID_POST ID_FORO_DESTINO`
-Clona inmediatamente en el foro que elijas.
-
-`!programar ID_POST ID_FORO_DESTINO YYYY-MM-DD HH:MM`
-Programa una clonación en el foro que elijas.
-
-Ejemplo:
-`!clonar 123456789123456789 987654321987654321`
-
-Ejemplo programado:
-`!programar 123456789123456789 987654321987654321 2026-05-08 20:00`
-""")
 @bot.command()
 async def hora(ctx):
     ahora = datetime.now(TZ)
@@ -104,9 +104,29 @@ async def tareas(ctx):
     texto = "**Publicaciones programadas:**\n\n"
 
     for job in jobs:
-        texto += f"ID: `{job.id}`\n"
-        texto += f"Hora: `{job.next_run_time.strftime('%Y-%m-%d %H:%M:%S')}`\n\n"
+        texto += f"Job ID: `{job.id}`\n"
+        texto += f"Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n\n"
 
     await ctx.send(texto)
+
+
+@bot.command()
+async def ayuda(ctx):
+    await ctx.send("""
+**Comandos**
+
+`!clonar_ahora ID_POST ID_FORO_DESTINO`
+Clona inmediatamente.
+
+`!programar ID_POST ID_FORO_DESTINO YYYY-MM-DD HH:MM`
+Programa una clonación.
+
+`!hora`
+Muestra la hora actual del bot.
+
+`!tareas`
+Muestra publicaciones programadas.
+""")
+
 
 bot.run(TOKEN)

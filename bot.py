@@ -80,8 +80,9 @@ async def tareas(interaction: discord.Interaction):
     texto = "**Publicaciones programadas:**\n\n"
 
     for job in jobs:
-        texto += f"Job ID: `{job.id}`\n"
-        texto += f"Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n\n"
+        texto += f"📌 Publicación: `{job.name}`\n"
+        texto += f"🕒 Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
+        texto += f"🆔 Job ID: `{job.id}`\n\n"
 
     await interaction.followup.send(texto, ephemeral=True)
 
@@ -139,12 +140,17 @@ async def programar_aqui(
             minutes=minutos
         )
 
+thread = interaction.channel
+nombre_post = getattr(thread, "name", "Post sin nombre")
+
         job = scheduler.add_job(
-            clonar_post,
-            "date",
-            run_date=fecha_hora,
-            args=[post_id, foro_destino.id]
-        )
+    clonar_post,
+    "date",
+    run_date=fecha_hora,
+    args=[post_id, foro_destino.id],
+    id=f"{post_id}-{foro_destino.id}-{int(fecha_hora.timestamp())}",
+    name=f"{nombre_post} → {foro_destino.name}"
+)
 
         await interaction.followup.send(
             f"✅ Publicación programada.\n"
@@ -157,5 +163,37 @@ async def programar_aqui(
     except Exception as e:
         await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
 
+@bot.tree.command(
+    name="cancelar_tarea",
+    description="Cancela una publicación programada",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def cancelar_tarea(
+    interaction: discord.Interaction,
+    job_id: str
+):
+    await interaction.response.defer(ephemeral=True)
 
+    try:
+        job = scheduler.get_job(job_id)
+
+        if not job:
+            await interaction.followup.send(
+                "❌ No se encontró esa tarea.",
+                ephemeral=True
+            )
+            return
+
+        scheduler.remove_job(job_id)
+
+        await interaction.followup.send(
+            f"🗑️ Tarea cancelada.\n🆔 Job ID: `{job_id}`",
+            ephemeral=True
+        )
+
+    except Exception as e:
+        await interaction.followup.send(
+            f"❌ Error: `{e}`",
+            ephemeral=True
+        )
 bot.run(TOKEN)

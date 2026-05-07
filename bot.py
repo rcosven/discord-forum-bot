@@ -87,6 +87,26 @@ Ejemplo:
 Ejemplo programado:
 `!programar 123456789123456789 987654321987654321 2026-05-08 20:00`
 """)
+@bot.command()
+async def hora(ctx):
+    ahora = datetime.now(TZ)
+    await ctx.send(f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`")
 
+
+@bot.command()
+async def tareas(ctx):
+    jobs = scheduler.get_jobs()
+
+    if not jobs:
+        await ctx.send("📭 No hay publicaciones programadas.")
+        return
+
+    texto = "**Publicaciones programadas:**\n\n"
+
+    for job in jobs:
+        texto += f"ID: `{job.id}`\n"
+        texto += f"Hora: `{job.next_run_time.strftime('%Y-%m-%d %H:%M:%S')}`\n\n"
+
+    await ctx.send(texto)
 
 bot.run(TOKEN)

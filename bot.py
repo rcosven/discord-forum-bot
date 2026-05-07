@@ -144,4 +144,43 @@ async def hora_slash(interaction: discord.Interaction):
     await interaction.response.send_message(
         f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
     )
+@bot.tree.command(name="programar", description="Programa una publicación")
+async def programar_slash(
+    interaction: discord.Interaction,
+    post_id: str,
+    foro_destino: discord.ForumChannel,
+    fecha: str,
+    hora: str
+):
+
+    try:
+        fecha_hora = datetime.strptime(f"{fecha} {hora}", "%Y-%m-%d %H:%M")
+        fecha_hora = fecha_hora.replace(tzinfo=TZ)
+
+        ahora = datetime.now(TZ)
+
+        if fecha_hora <= ahora:
+            await interaction.response.send_message(
+                f"❌ Esa hora ya pasó.\n"
+                f"Hora actual: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`",
+                ephemeral=True
+            )
+            return
+
+        job = scheduler.add_job(
+            clonar_post,
+            "date",
+            run_date=fecha_hora,
+            args=[int(post_id), foro_destino.id]
+        )
+
+        await interaction.response.send_message(
+            f"✅ Programado.\n"
+            f"📁 Destino: {foro_destino.mention}\n"
+            f"🕒 Hora: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}`"
+        )
+
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: `{e}`")
+
 bot.run(TOKEN)

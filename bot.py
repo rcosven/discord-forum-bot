@@ -44,8 +44,18 @@ async def on_ready():
     if not scheduler.running:
         scheduler.start()
 
-    synced = await bot.tree.sync(guild=GUILD)
-    print(f"Slash commands sincronizados: {len(synced)}")
+    try:
+        # limpia comandos globales viejos
+        bot.tree.clear_commands(guild=None)
+        await bot.tree.sync()
+
+        # sincroniza solo comandos del servidor
+        synced = await bot.tree.sync(guild=GUILD)
+
+        print(f"Slash commands sincronizados: {len(synced)}")
+
+    except Exception as e:
+        print(e)
 
 
 @bot.tree.command(name="hora", description="Muestra la hora actual del bot", guild=GUILD)

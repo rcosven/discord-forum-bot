@@ -8,7 +8,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-
+GUILD_ID = int(os.getenv("GUILD_ID"))
 TZ = ZoneInfo("America/Santiago")
 
 intents = discord.Intents.default()
@@ -183,6 +183,4 @@ async def programar_slash(
 
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: `{e}`")
-
 bot.run(TOKEN)
-GUILD_ID = int(os.getenv("GUILD_ID"))

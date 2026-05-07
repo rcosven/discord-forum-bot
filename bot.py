@@ -1,3 +1,5 @@
+from discord import app_commands
+
 import os
 import discord
 from discord.ext import commands
@@ -42,8 +44,15 @@ async def clonar_post(post_id: int, foro_destino_id: int):
 @bot.event
 async def on_ready():
     print(f"Bot conectado como {bot.user}")
+
     if not scheduler.running:
         scheduler.start()
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"Slash commands sincronizados: {len(synced)}")
+    except Exception as e:
+        print(e)
 
 
 @bot.command(name="clonar_ahora")
@@ -128,5 +137,11 @@ Muestra la hora actual del bot.
 Muestra publicaciones programadas.
 """)
 
+@bot.tree.command(name="hora", description="Muestra la hora actual del bot")
+async def hora_slash(interaction: discord.Interaction):
+    ahora = datetime.now(TZ)
 
+    await interaction.response.send_message(
+        f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
+    )
 bot.run(TOKEN)

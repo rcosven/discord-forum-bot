@@ -9,7 +9,6 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 
 TZ = ZoneInfo("America/Santiago")
-GUILD = discord.Object(id=GUILD_ID)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -20,9 +19,13 @@ scheduler = AsyncIOScheduler(timezone=TZ)
 
 async def clonar_post(post_id: int, foro_destino_id: int):
     thread = await bot.fetch_channel(post_id)
-    foro_destino = await bot.fetch_channel(foro_destino_id)
+
+    foro_destino = bot.get_channel(foro_destino_id)
+    if foro_destino is None:
+        foro_destino = await bot.fetch_channel(foro_destino_id)
 
     starter_message = await thread.fetch_message(thread.id)
+    contenido = starter_message.content
 
     archivos = []
     for attachment in starter_message.attachments:
@@ -32,7 +35,7 @@ async def clonar_post(post_id: int, foro_destino_id: int):
 
     await foro_destino.create_thread(
         name=thread.name,
-        content=starter_message.content,
+        content=contenido,
         files=archivos
     )
 
@@ -45,196 +48,114 @@ async def on_ready():
         scheduler.start()
 
     try:
-        # limpia comandos globales viejos
-        bot.tree.clear_commands(guild=None)
-        await bot.tree.sync()
-
-        # sincroniza solo comandos del servidor
-        synced = await bot.tree.sync(guild=GUILD)
-
+        guild = discord.Object(id=GUILD_ID)
+        synced = await bot.tree.sync(guild=guild)
         print(f"Slash commands sincronizados: {len(synced)}")
-
     except Exception as e:
         print(e)
 
 
-@bot.tree.command(name="hora", description="Muestra la hora actual del bot", guild=GUILD)
+@bot.tree.command(name="hora", description="Muestra la hora actual del bot", guild=discord.Object(id=GUILD_ID))
 async def hora(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        f"🕒 Hora actual del bot: `{datetime.now(TZ).strftime('%Y-%m-%d %H:%M:%S')}`",
+    await interaction.response.defer(ephemeral=True)
+
+    ahora = datetime.now(TZ)
+
+    await interaction.followup.send(
+        f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`",
         ephemeral=True
     )
 
 
-@bot.tree.command(name="programar", description="Programa con fecha exacta", guild=GUILD)
-async def programar(
-    interaction: discord.Interaction,
-    post_id: str,
-    foro_destino: discord.ForumChannel,
-    fecha: str,
-    hora: int,
-    minuto: int
-):
-    await interaction.response.defer(ephemeral=True)
-
-    try:
-        if hora < 0 or hora > 23:
-            await interaction.followup.send("❌ La hora debe estar entre 0 y 23.", ephemeral=True)
-            return
-
-        if minuto < 0 or minuto > 59:
-            await interaction.followup.send("❌ El minuto debe estar entre 0 y 59.", ephemeral=True)
-            return
-
-        fecha_hora = datetime.strptime(fecha, "%Y-%m-%d")
-        fecha_hora = fecha_hora.replace(hour=hora, minute=minuto, tzinfo=TZ)
-
-        if fecha_hora <= datetime.now(TZ):
-            await interaction.followup.send(
-                f"❌ Esa hora ya pasó.\n"
-                f"Hora actual: `{datetime.now(TZ).strftime('%Y-%m-%d %H:%M:%S')}`",
-                ephemeral=True
-            )
-            return
-
-        job = scheduler.add_job(
-            clonar_post,
-            "date",
-            run_date=fecha_hora,
-            args=[int(post_id), foro_destino.id]
-        )
-
-        await interaction.followup.send(
-            f"✅ Programado correctamente.\n"
-            f"📌 Post ID: `{post_id}`\n"
-            f"📁 Destino: {foro_destino.mention}\n"
-            f"🕒 Hora: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
-            f"🆔 Job ID: `{job.id}`",
-            ephemeral=True
-        )
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
-
-
-@bot.tree.command(name="programar_rapido", description="Programa usando días, hora y minuto", guild=GUILD)
-async def programar_rapido(
-    interaction: discord.Interaction,
-    post_id: str,
-    foro_destino: discord.ForumChannel,
-    dias: int,
-    hora: int,
-    minuto: int
-):
-    await interaction.response.defer(ephemeral=True)
-
-    try:
-        if dias < 0:
-            await interaction.followup.send("❌ Los días no pueden ser negativos.", ephemeral=True)
-            return
-
-        if hora < 0 or hora > 23:
-            await interaction.followup.send("❌ La hora debe estar entre 0 y 23.", ephemeral=True)
-            return
-
-        if minuto < 0 or minuto > 59:
-            await interaction.followup.send("❌ El minuto debe estar entre 0 y 59.", ephemeral=True)
-            return
-
-        ahora = datetime.now(TZ)
-        fecha_base = ahora + timedelta(days=dias)
-
-        fecha_hora = fecha_base.replace(
-            hour=hora,
-            minute=minuto,
-            second=0,
-            microsecond=0
-        )
-
-        if fecha_hora <= ahora:
-            await interaction.followup.send(
-                f"❌ Esa hora ya pasó.\n"
-                f"Hora actual: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`",
-                ephemeral=True
-            )
-            return
-
-        job = scheduler.add_job(
-            clonar_post,
-            "date",
-            run_date=fecha_hora,
-            args=[int(post_id), foro_destino.id]
-        )
-
-        await interaction.followup.send(
-            f"✅ Programado rápido.\n"
-            f"📌 Post ID: `{post_id}`\n"
-            f"📁 Destino: {foro_destino.mention}\n"
-            f"📆 Días desde hoy: `{dias}`\n"
-            f"🕒 Hora: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
-            f"🆔 Job ID: `{job.id}`",
-            ephemeral=True
-        )
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
-
-
-@bot.tree.command(name="programar_test", description="Programa una prueba en X minutos", guild=GUILD)
-async def programar_test(
-    interaction: discord.Interaction,
-    post_id: str,
-    foro_destino: discord.ForumChannel,
-    minutos: int
-):
-    await interaction.response.defer(ephemeral=True)
-
-    try:
-        if minutos <= 0:
-            await interaction.followup.send("❌ Los minutos deben ser mayores a 0.", ephemeral=True)
-            return
-
-        fecha_hora = datetime.now(TZ) + timedelta(minutes=minutos)
-
-        job = scheduler.add_job(
-            clonar_post,
-            "date",
-            run_date=fecha_hora,
-            args=[int(post_id), foro_destino.id]
-        )
-
-        await interaction.followup.send(
-            f"✅ Test programado.\n"
-            f"📌 Post ID: `{post_id}`\n"
-            f"📁 Destino: {foro_destino.mention}\n"
-            f"⏱️ En: `{minutos}` minuto(s)\n"
-            f"🕒 Hora exacta: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
-            f"🆔 Job ID: `{job.id}`",
-            ephemeral=True
-        )
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
-
-
-@bot.tree.command(name="tareas", description="Muestra publicaciones programadas", guild=GUILD)
+@bot.tree.command(name="tareas", description="Muestra publicaciones programadas", guild=discord.Object(id=GUILD_ID))
 async def tareas(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
     jobs = scheduler.get_jobs()
 
     if not jobs:
-        await interaction.response.send_message(
-            "📭 No hay publicaciones programadas.",
-            ephemeral=True
-        )
+        await interaction.followup.send("📭 No hay publicaciones programadas.", ephemeral=True)
         return
 
     texto = "**Publicaciones programadas:**\n\n"
 
     for job in jobs:
-        texto += f"🆔 Job ID: `{job.id}`\n"
-        texto += f"🕒 Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n\n"
+        texto += f"Job ID: `{job.id}`\n"
+        texto += f"Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n\n"
 
-    await interaction.response.send_message(texto, ephemeral=True)
+    await interaction.followup.send(texto, ephemeral=True)
+
+
+@bot.tree.command(name="clonar_aqui", description="Clona este post al foro destino", guild=discord.Object(id=GUILD_ID))
+async def clonar_aqui(
+    interaction: discord.Interaction,
+    foro_destino: discord.ForumChannel
+):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        post_id = interaction.channel.id
+
+        await clonar_post(post_id, foro_destino.id)
+
+        await interaction.followup.send(
+            f"✅ Publicación clonada.\n"
+            f"📁 Destino: {foro_destino.mention}",
+            ephemeral=True
+        )
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
+
+
+@bot.tree.command(name="programar_aqui", description="Programa este post para publicarse después", guild=discord.Object(id=GUILD_ID))
+async def programar_aqui(
+    interaction: discord.Interaction,
+    foro_destino: discord.ForumChannel,
+    dias: int = 0,
+    horas: int = 0,
+    minutos: int = 0
+):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        if dias < 0 or horas < 0 or minutos < 0:
+            await interaction.followup.send("❌ No uses números negativos.", ephemeral=True)
+            return
+
+        if dias == 0 and horas == 0 and minutos == 0:
+            await interaction.followup.send(
+                "❌ Debes poner al menos minutos, horas o días.",
+                ephemeral=True
+            )
+            return
+
+        post_id = interaction.channel.id
+        ahora = datetime.now(TZ)
+
+        fecha_hora = ahora + timedelta(
+            days=dias,
+            hours=horas,
+            minutes=minutos
+        )
+
+        job = scheduler.add_job(
+            clonar_post,
+            "date",
+            run_date=fecha_hora,
+            args=[post_id, foro_destino.id]
+        )
+
+        await interaction.followup.send(
+            f"✅ Publicación programada.\n"
+            f"📁 Destino: {foro_destino.mention}\n"
+            f"🕒 Publicará: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
+            f"🆔 Job ID: `{job.id}`",
+            ephemeral=True
+        )
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
 
 
 bot.run(TOKEN)

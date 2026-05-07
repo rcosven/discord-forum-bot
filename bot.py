@@ -56,95 +56,15 @@ async def on_ready():
         print(e)
 
 
-@bot.command(name="clonar_ahora")
-async def clonar_ahora(ctx, post_id: int, foro_destino_id: int):
-    await ctx.send("Clonando publicación...")
-    try:
-        await clonar_post(post_id, foro_destino_id)
-        await ctx.send("✅ Publicación clonada correctamente.")
-    except Exception as e:
-        await ctx.send(f"❌ Error: `{e}`")
-
-
-@bot.command()
-async def programar(ctx, post_id: int, foro_destino_id: int, fecha: str, hora: str):
-    try:
-        fecha_hora = datetime.strptime(f"{fecha} {hora}", "%Y-%m-%d %H:%M")
-        fecha_hora = fecha_hora.replace(tzinfo=TZ)
-
-        ahora = datetime.now(TZ)
-
-        if fecha_hora <= ahora:
-            await ctx.send(
-                f"❌ Esa hora ya pasó.\n"
-                f"Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
-            )
-            return
-
-        job = scheduler.add_job(
-            clonar_post,
-            "date",
-            run_date=fecha_hora,
-            args=[post_id, foro_destino_id]
-        )
-
-        await ctx.send(
-            f"✅ Programado para `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile.\n"
-            f"Job ID: `{job.id}`"
-        )
-
-    except Exception as e:
-        await ctx.send(f"❌ Error: `{e}`")
-
-
-@bot.command()
-async def hora(ctx):
-    ahora = datetime.now(TZ)
-    await ctx.send(f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`")
-
-
-@bot.command()
-async def tareas(ctx):
-    jobs = scheduler.get_jobs()
-
-    if not jobs:
-        await ctx.send("📭 No hay publicaciones programadas.")
-        return
-
-    texto = "**Publicaciones programadas:**\n\n"
-
-    for job in jobs:
-        texto += f"Job ID: `{job.id}`\n"
-        texto += f"Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n\n"
-
-    await ctx.send(texto)
-
-
-@bot.command()
-async def ayuda(ctx):
-    await ctx.send("""
-**Comandos**
-
-`!clonar_ahora ID_POST ID_FORO_DESTINO`
-Clona inmediatamente.
-
-`!programar ID_POST ID_FORO_DESTINO YYYY-MM-DD HH:MM`
-Programa una clonación.
-
-`!hora`
-Muestra la hora actual del bot.
-
-`!tareas`
-Muestra publicaciones programadas.
-""")
-
 @bot.tree.command(name="hora", description="Muestra la hora actual del bot", guild=discord.Object(id=GUILD_ID))
 async def hora_slash(interaction: discord.Interaction):
     ahora = datetime.now(TZ)
-
     await interaction.response.send_message(
-        f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`"
+        f"🕒 Hora actual del bot: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`",
+        ephemeral=True
     )
+
+
 @bot.tree.command(name="programar", description="Programa una publicación", guild=discord.Object(id=GUILD_ID))
 async def programar_slash(
     interaction: discord.Interaction,
@@ -162,7 +82,7 @@ async def programar_slash(
         ahora = datetime.now(TZ)
 
         if fecha_hora <= ahora:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"❌ Esa hora ya pasó.\n"
                 f"Hora actual: `{ahora.strftime('%Y-%m-%d %H:%M:%S')}`",
                 ephemeral=True
@@ -176,12 +96,33 @@ async def programar_slash(
             args=[int(post_id), foro_destino.id]
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ Programado.\n"
             f"📁 Destino: {foro_destino.mention}\n"
-            f"🕒 Hora: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}`"
+            f"🕒 Hora: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
+            f"🆔 Job ID: `{job.id}`",
+            ephemeral=True
         )
 
     except Exception as e:
-        await interaction.response.send_message(f"❌ Error: `{e}`")
+        await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
+
+
+@bot.tree.command(name="tareas", description="Muestra publicaciones programadas", guild=discord.Object(id=GUILD_ID))
+async def tareas_slash(interaction: discord.Interaction):
+    jobs = scheduler.get_jobs()
+
+    if not jobs:
+        await interaction.response.send_message("📭 No hay publicaciones programadas.", ephemeral=True)
+        return
+
+    texto = "**Publicaciones programadas:**\n\n"
+
+    for job in jobs:
+        texto += f"Job ID: `{job.id}`\n"
+        texto += f"Hora: `{job.next_run_time.astimezone(TZ).strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n\n"
+
+    await interaction.response.send_message(texto, ephemeral=True)
+
+
 bot.run(TOKEN)

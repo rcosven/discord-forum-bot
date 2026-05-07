@@ -140,20 +140,21 @@ async def programar_aqui(
             minutes=minutos
         )
 
-thread = interaction.channel
-nombre_post = getattr(thread, "name", "Post sin nombre")
+        thread = interaction.channel
+        nombre_post = getattr(thread, "name", "Post sin nombre")
 
         job = scheduler.add_job(
-    clonar_post,
-    "date",
-    run_date=fecha_hora,
-    args=[post_id, foro_destino.id],
-    id=f"{post_id}-{foro_destino.id}-{int(fecha_hora.timestamp())}",
-    name=f"{nombre_post} → {foro_destino.name}"
-)
+            clonar_post,
+            "date",
+            run_date=fecha_hora,
+            args=[post_id, foro_destino.id],
+            id=f"{post_id}-{foro_destino.id}-{int(fecha_hora.timestamp())}",
+            name=f"{nombre_post} → {foro_destino.name}"
+        )
 
         await interaction.followup.send(
             f"✅ Publicación programada.\n"
+            f"📌 Publicación: `{nombre_post}`\n"
             f"📁 Destino: {foro_destino.mention}\n"
             f"🕒 Publicará: `{fecha_hora.strftime('%Y-%m-%d %H:%M:%S')}` hora Chile\n"
             f"🆔 Job ID: `{job.id}`",
@@ -162,6 +163,7 @@ nombre_post = getattr(thread, "name", "Post sin nombre")
 
     except Exception as e:
         await interaction.followup.send(f"❌ Error: `{e}`", ephemeral=True)
+
 
 @bot.tree.command(
     name="cancelar_tarea",
@@ -196,4 +198,6 @@ async def cancelar_tarea(
             f"❌ Error: `{e}`",
             ephemeral=True
         )
+
+
 bot.run(TOKEN)

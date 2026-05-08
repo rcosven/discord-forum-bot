@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
+ROL_PERMITIDO = "Publicador"
 
 TZ = ZoneInfo("America/Santiago")
 
@@ -15,6 +16,21 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 scheduler = AsyncIOScheduler(timezone=TZ)
+
+
+def tiene_permiso(interaction: discord.Interaction):
+    return any(role.name == ROL_PERMITIDO for role in interaction.user.roles)
+
+
+async def verificar_permiso(interaction: discord.Interaction):
+    if not tiene_permiso(interaction):
+        await interaction.followup.send(
+            "❌ No tienes permisos para usar este comando.",
+            ephemeral=True
+        )
+        return False
+
+    return True
 
 
 async def clonar_post(post_id: int, foro_destino_id: int):
@@ -94,6 +110,9 @@ async def clonar_aqui(
 ):
     await interaction.response.defer(ephemeral=True)
 
+    if not await verificar_permiso(interaction):
+        return
+
     try:
         post_id = interaction.channel.id
 
@@ -118,6 +137,9 @@ async def programar_aqui(
     minutos: int = 0
 ):
     await interaction.response.defer(ephemeral=True)
+
+    if not await verificar_permiso(interaction):
+        return
 
     try:
         if dias < 0 or horas < 0 or minutos < 0:
@@ -175,6 +197,9 @@ async def cancelar_tarea(
     job_id: str
 ):
     await interaction.response.defer(ephemeral=True)
+
+    if not await verificar_permiso(interaction):
+        return
 
     try:
         job = scheduler.get_job(job_id)

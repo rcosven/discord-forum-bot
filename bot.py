@@ -34,19 +34,30 @@ async def verificar_permiso(interaction: discord.Interaction):
 
 
 async def clonar_post(post_id: int, foro_destino_id: int):
+    print(f"[CLONAR] Iniciando clonación")
+    print(f"[CLONAR] Post origen ID: {post_id}")
+    print(f"[CLONAR] Foro destino ID: {foro_destino_id}")
+
     thread = await bot.fetch_channel(post_id)
+    print(f"[CLONAR] Thread encontrado: {thread.name}")
 
     foro_destino = bot.get_channel(foro_destino_id)
     if foro_destino is None:
         foro_destino = await bot.fetch_channel(foro_destino_id)
+
+    print(f"[CLONAR] Foro destino encontrado: {foro_destino.name}")
 
     starter_message = await thread.fetch_message(thread.id)
     contenido = starter_message.content
 
     archivos = []
     for attachment in starter_message.attachments:
+        print(f"[CLONAR] Attachment: {attachment.filename}")
+
         if attachment.filename.lower().endswith((".zip", ".rar", ".7z")):
+            print(f"[CLONAR] Saltando archivo comprimido: {attachment.filename}")
             continue
+
         archivos.append(await attachment.to_file())
 
     await foro_destino.create_thread(
@@ -54,6 +65,8 @@ async def clonar_post(post_id: int, foro_destino_id: int):
         content=contenido,
         files=archivos
     )
+
+    print(f"[CLONAR] Publicación clonada correctamente")
 
 
 @bot.event
